@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Diagrama de Gantt - Proyecto</title>
+<style>
+  :root{
+    --bg: #ffffff;
+    --panel: #f6f7f9;
+    --text: #222;
+    --muted: #6b7280;
+    --accent: #0b63b8; /* corporate blue */
+    --accent-dark: #084b86;
+    --bar: #0b63b8;
+    --bar-border: #07457a;
+    --grid: #e6e9ef;
+    --font-sans: "Segoe UI", Roboto, Arial, sans-serif;
+  }
+
+  html,body{
+    height:100%;
+    margin:0;
+    font-family:var(--font-sans);
+    background:var(--bg);
+    color:var(--text);
+  }
+
+  .container{
+    max-width:1100px;
+    margin:28px auto;
+    padding:20px;
+    background:linear-gradient(180deg,var(--panel),#fff);
+    border-radius:8px;
+    box-shadow: 0 6px 18px rgba(10,20,40,0.06);
+    border:1px solid #e8edf4;
+  }
+
+  header{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:14px;
+  }
+
+  header h1{
+    font-size:20px;
+    margin:0;
+    color:var(--accent-dark);
+  }
+
+  .subtitle{
+    color:var(--muted);
+    font-size:13px;
+    margin-top:4px;
+  }
+
+  .controls{
+    display:flex;
+    gap:8px;
+    align-items:center;
+  }
+
+  button{
+    background:var(--accent);
+    color:white;
+    border:none;
+    padding:10px 14px;
+    border-radius:6px;
+    font-weight:600;
+    cursor:pointer;
+    box-shadow: 0 2px 6px rgba(11,99,184,0.18);
+  }
+
+  button.secondary{
+    background:#fff;
+    color:var(--accent);
+    border:1px solid #dbe9fc;
+    box-shadow:none;
+    font-weight:600;
+  }
+
+  /* gantt area */
+  .gantt-wrap{
+    overflow:auto;
+    padding:12px;
+    border-radius:6px;
+    background: white;
+    margin-top:8px;
+    border:1px solid #eef3fb;
+  }
+
+  .gantt {
+    width:100%;
+    min-width:980px;
+    display:block;
+  }
+
+  .legend{
+    display:flex;
+    gap:18px;
+    align-items:center;
+    margin-top:10px;
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  .legend .chip{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    background:transparent;
+  }
+
+  .chip .sw{
+    width:16px; height:10px; border-radius:2px; display:inline-block;
+  }
+
+  /* Footer small */
+  .foot{
+    margin-top:12px;
+    font-size:12px;
+    color:var(--muted);
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Diagrama de Gantt — Sistema de gestión (Lecturas, Boletas y Control de Pagos)</h1>
+        <div class="subtitle">Cronograma de implementación (24 semanas) — Responsable: Miguel Martín Conde García</div>
+      </div>
+
+      <div class="controls">
+        <button id="downloadBtn">Descargar PNG</button>
+        <button class="secondary" id="printBtn">Imprimir</button>
+      </div>
+    </header>
+
+    <div class="gantt-wrap">
+      <!-- SVG Gantt -->
+      <svg id="ganttSvg" class="gantt" xmlns="http://www.w3.org/2000/svg"
+           viewBox="0 0 1200 420" preserveAspectRatio="xMinYMin meet">
+        <!-- Background -->
+        <rect x="0" y="0" width="1200" height="420" fill="#ffffff"/>
+
+        <!-- Title area -->
+        <text x="20" y="26" font-family="Segoe UI, Roboto, Arial" font-size="14" font-weight="700" fill="#0b63b8">
+          Cronograma por semanas
+        </text>
+
+        <!-- Vertical area for tasks -->
+        <!-- We'll draw grid and week labels -->
+      </svg>
+    </div>
+
+    <div class="legend">
+      <div class="chip"><span class="sw" style="background:var(--bar);border:1px solid var(--bar-border)"></span> Fase en ejecución</div>
+      <div class="chip"><span class="sw" style="background:#ffffff;border:1px dashed #cbd5e1"></span> Semana</div>
+    </div>
+
+    <div class="foot">
+      Nota: las barras representan la duración estimada de cada fase en semanas.
+    </div>
+  </div>
+
+<script>
+/*
+  Datos del proyecto (fácil de editar)
+  start: semana inicio (1-based)
+  duration: semanas de duración
+*/
+const tasks = [
+  { name: "Análisis de requerimientos", start: 1, duration: 4 },
+  { name: "Diseño del sistema", start: 5, duration: 4 },
+  { name: "Desarrollo del sistema", start: 9, duration: 8 },
+  { name: "Pruebas y correcciones", start: 17, duration: 4 },
+  { name: "Despliegue y documentación", start: 21, duration: 4 }
+];
+
+const totalWeeks = 24; // total columnas (semanas)
+const svg = document.getElementById('ganttSvg');
+
+// Visual layout settings
+const leftMargin = 260;      // espacio reservado para nombres de tareas
+const topMargin = 50;
+const rowHeight = 52;        // espacio vertical por tarea
+const barHeight = 20;
+const weekWidth = 34;        // ancho por semana
+const svgWidth = Math.max(leftMargin + totalWeeks * weekWidth + 40, 980);
+const svgHeight = topMargin + tasks.length * rowHeight + 40;
+
+svg.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
+svg.style.minWidth = svgWidth + 'px';
+
+// Draw week grid and labels
+for (let w = 1; w <= totalWeeks; w++) {
+  const x = leftMargin + (w - 1) * weekWidth;
+
+  // vertical grid line
+  const line = document.createElementNS('http://www.w3.org/2000/svg','rect');
+  line.setAttribute('x', x);
+  line.setAttribute('y', topMargin - 18);
+  line.setAttribute('width', 1);
+  line.setAttribute('height', tasks.length * rowHeight + 8);
+  line.setAttribute('fill', '#e6e9ef');
+  svg.appendChild(line);
+
+  // week number label
+  const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+  lbl.setAttribute('x', x + weekWidth/2);
+  lbl.setAttribute('y', topMargin - 24);
+  lbl.setAttribute('text-anchor','middle');
+  lbl.setAttribute('font-size','11');
+  lbl.setAttribute('fill','#6b7280');
+  lbl.setAttribute('font-family','Segoe UI, Roboto, Arial');
+  lbl.textContent = 'S' + w;
+  svg.appendChild(lbl);
+}
+
+// Left column header
+const headerRect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+headerRect.setAttribute('x', 0);
+headerRect.setAttribute('y', topMargin - 38);
+headerRect.setAttribute('width', leftMargin - 10);
+headerRect.setAttribute('height', 36);
+headerRect.setAttribute('fill', '#f8fbff');
+headerRect.setAttribute('stroke', '#eef3fb');
+svg.appendChild(headerRect);
+
+const headerText = document.createElementNS('http://www.w3.org/2000/svg','text');
+headerText.setAttribute('x', 12);
+headerText.setAttribute('y', topMargin - 14);
+headerText.setAttribute('font-size','12');
+headerText.setAttribute('font-weight','700');
+headerText.setAttribute('fill','#0b63b8');
+headerText.setAttribute('font-family','Segoe UI, Roboto, Arial');
+headerText.textContent = 'Fase / Actividad';
+svg.appendChild(headerText);
+
+// Draw tasks rows
+tasks.forEach((task, idx) => {
+  const y = topMargin + idx * rowHeight;
+
+  // Row background (alternating)
+  if (idx % 2 === 0) {
+    const rowBg = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    rowBg.setAttribute('x', 0);
+    rowBg.setAttribute('y', y - 8);
+    rowBg.setAttribute('width', svgWidth);
+    rowBg.setAttribute('height', rowHeight);
+    rowBg.setAttribute('fill', idx % 2 === 0 ? '#ffffff' : '#fbfdff');
+    svg.appendChild(rowBg);
+  }
+
+  // Task name (left column)
+  const name = document.createElementNS('http://www.w3.org/2000/svg','text');
+  name.setAttribute('x', 12);
+  name.setAttribute('y', y + 6);
+  name.setAttribute('font-size','13');
+  name.setAttribute('fill','#111827');
+  name.setAttribute('font-weight','700');
+  name.setAttribute('font-family','Segoe UI, Roboto, Arial');
+  name.textContent = task.name;
+  svg.appendChild(name);
+
+  // Optional small description / timeline text
+  const desc = document.createElementNS('http://www.w3.org/2000/svg','text');
+  desc.setAttribute('x', 12);
+  desc.setAttribute('y', y + 22);
+  desc.setAttribute('font-size','11');
+  desc.setAttribute('fill','#6b7280');
+  desc.setAttribute('font-family','Segoe UI, Roboto, Arial');
+  desc.textContent = `Inicio: S${task.start} — Duración: ${task.duration} semanas`;
+  svg.appendChild(desc);
+
+  // Draw baseline week grid for this row (subtle)
+  for (let w = 1; w <= totalWeeks; w++) {
+    const gx = leftMargin + (w - 1) * weekWidth;
+    const g = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    g.setAttribute('x', gx);
+    g.setAttribute('y', y - (barHeight/2));
+    g.setAttribute('width', weekWidth);
+    g.setAttribute('height', barHeight);
+    g.setAttribute('fill', (w % 2 === 0) ? '#ffffff' : '#fbfdff');
+    svg.appendChild(g);
+  }
+
+  // Draw bar for the task
+  const barX = leftMargin + (task.start - 1) * weekWidth + 6;
+  const barY = y - (barHeight/2) + 6;
+  const barW = task.duration * weekWidth - 12;
+
+  const bar = document.createElementNS('http://www.w3.org/2000/svg','rect');
+  bar.setAttribute('x', barX);
+  bar.setAttribute('y', barY);
+  bar.setAttribute('rx', 6);
+  bar.setAttribute('ry', 6);
+  bar.setAttribute('height', barHeight - 6);
+  bar.setAttribute('width', barW);
+  bar.setAttribute('fill', '#0b63b8');
+  bar.setAttribute('stroke', '#07457a');
+  svg.appendChild(bar);
+
+  // Label on bar
+  const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+  label.setAttribute('x', barX + 8);
+  label.setAttribute('y', barY + (barHeight/2) + 2);
+  label.setAttribute('font-size','12');
+  label.setAttribute('fill','#ffffff');
+  label.setAttribute('font-family','Segoe UI, Roboto, Arial');
+  label.textContent = `${task.name} (${task.duration} s.)`;
+  svg.appendChild(label);
+
+});
+
+// Draw bottom axis line
+const axis = document.createElementNS('http://www.w3.org/2000/svg','rect');
+axis.setAttribute('x', leftMargin);
+axis.setAttribute('y', topMargin + tasks.length * rowHeight + 6);
+axis.setAttribute('width', totalWeeks * weekWidth);
+axis.setAttribute('height', 1);
+axis.setAttribute('fill', '#e6e9ef');
+svg.appendChild(axis);
+
+/* ---------- Download PNG logic ---------- */
+function svgToPngDownload(svgElement, filename = 'gantt.png', scale = 2) {
+  const serializer = new XMLSerializer();
+  const svgString = serializer.serializeToString(svgElement);
+
+  // inline CSS fix: ensure foreign fonts/ styles are preserved by embedding computed CSS (we used basic fonts)
+  const blob = new Blob([svgString], {type: 'image/svg+xml;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+
+  const img = new Image();
+  img.onload = function() {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width * scale;
+    canvas.height = img.height * scale;
+    const ctx = canvas.getContext('2d');
+
+    // White background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0,0,canvas.width, canvas.height);
+
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+
+    canvas.toBlob(function(blob) {
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }, 'image/png', 1);
+  };
+  img.onerror = function(e){
+    alert('Error al convertir SVG a imagen. Intenta en otro navegador.');
+    URL.revokeObjectURL(url);
+  };
+
+  img.src = url;
+}
+
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  const svgEl = document.getElementById('ganttSvg');
+  // ensure computed size
+  svgEl.setAttribute('width', svgEl.viewBox.baseVal.width);
+  svgEl.setAttribute('height', svgEl.viewBox.baseVal.height);
+  svgToPngDownload(svgEl, 'diagrama_gantt_proyecto.png', 3);
+});
+
+document.getElementById('printBtn').addEventListener('click', () => {
+  // open print view
+  const svgEl = document.getElementById('ganttSvg');
+  const serializer = new XMLSerializer();
+  const svgString = serializer.serializeToString(svgEl);
+  const w = window.open('', '_blank');
+  w.document.write('<html><head><title>Imprimir Gantt</title></head><body>');
+  w.document.write(svgString);
+  w.document.write('</body></html>');
+  w.document.close();
+  w.focus();
+  setTimeout(()=> w.print(), 400);
+});
+
+</script>
+</body>
+</html>
